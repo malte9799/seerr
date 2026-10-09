@@ -21,7 +21,7 @@ const MAX_FAVORITES = 100;
 
 // Only the strongest signals are expanded through TMDB, which bounds the
 // number of upstream requests per rebuild to roughly 2 * MAX_SEEDS.
-const MAX_SEEDS = 20;
+const MAX_SEEDS = 60;
 
 // A title watched this many days ago counts half as much as one watched today.
 const RECENCY_HALF_LIFE_DAYS = 90;
