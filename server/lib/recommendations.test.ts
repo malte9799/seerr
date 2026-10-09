@@ -96,7 +96,7 @@ describe('buildWatchHistory', () => {
     assert.ok(history.watched.has('tv:10'));
   });
 
-  it('boosts favorites and keeps unplayed favorites recommendable', () => {
+  it('weights favorites heavily whether watched or not', () => {
     const history = buildWatchHistory({
       movies: [
         item({
@@ -104,18 +104,36 @@ describe('buildWatchHistory', () => {
           ProviderIds: { Tmdb: '1' },
           UserData: { PlayCount: 1, LastPlayedDate: daysAgo(0) },
         }),
+        item({
+          Id: 'old',
+          ProviderIds: { Tmdb: '2' },
+          UserData: { PlayCount: 1, LastPlayedDate: daysAgo(90) },
+        }),
+        item({
+          Id: 'b',
+          ProviderIds: { Tmdb: '3' },
+          UserData: { PlayCount: 8, LastPlayedDate: daysAgo(0) },
+        }),
       ],
       episodes: [],
       series: [],
       favorites: [
         item({ Id: 'a', ProviderIds: { Tmdb: '1' } }),
+        item({ Id: 'old', ProviderIds: { Tmdb: '2' } }),
         item({ Id: 'fav', Type: 'Series', ProviderIds: { Tmdb: '20' } }),
       ],
       now: NOW,
     });
 
-    assert.equal(weightOf(history, MediaType.MOVIE, 1), 1.5);
-    assert.equal(weightOf(history, MediaType.TV, 20), 0.75);
+    assert.equal(weightOf(history, MediaType.MOVIE, 1), 6);
+    // Favorites do not fade with time.
+    assert.equal(weightOf(history, MediaType.MOVIE, 2), 5.5);
+    assert.equal(weightOf(history, MediaType.TV, 20), 5);
+    // Even an unwatched favorite outweighs a heavily rewatched movie.
+    assert.ok(
+      weightOf(history, MediaType.TV, 20)! >
+        weightOf(history, MediaType.MOVIE, 3)!
+    );
     assert.ok(!history.watched.has('tv:20'));
   });
 });

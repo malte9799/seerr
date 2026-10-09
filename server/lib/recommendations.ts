@@ -26,6 +26,11 @@ const MAX_SEEDS = 20;
 // A title watched this many days ago counts half as much as one watched today.
 const RECENCY_HALF_LIFE_DAYS = 90;
 
+// Favorites are the most explicit taste signal, so they add a fixed weight
+// that does not decay. This matches a show binged for ~30 episodes this week,
+// keeping favorites among the strongest seeds whether watched or not.
+const FAVORITE_WEIGHT = 5;
+
 // Titles with fewer votes than this are mostly noise in TMDB recommendations.
 const MIN_VOTE_COUNT = 25;
 
@@ -74,7 +79,8 @@ const getTmdbId = (item: JellyfinLibraryItemExtended): number | undefined => {
  *
  * Movies are weighted by rewatches, shows by how many episodes were watched,
  * so a show binged for three seasons outweighs a pilot that was abandoned.
- * Favorites get a boost, and everything decays with time since last played.
+ * Watch history decays with time since last played, while favorites add a
+ * large fixed weight on top, whether they were watched or not.
  */
 export const buildWatchHistory = ({
   movies,
@@ -148,13 +154,12 @@ export const buildWatchHistory = ({
     const seed = seeds.get(historyKey(mediaType, tmdbId));
 
     if (seed) {
-      seed.weight *= 1.5;
+      seed.weight += FAVORITE_WEIGHT;
     } else {
-      // Favorited but never played still says something about taste.
       seeds.set(historyKey(mediaType, tmdbId), {
         tmdbId,
         mediaType,
-        weight: 0.75,
+        weight: FAVORITE_WEIGHT,
       });
     }
   }
