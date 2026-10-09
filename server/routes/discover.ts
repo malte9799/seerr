@@ -13,6 +13,7 @@ import type {
   GenreSliderItem,
   WatchlistResponse,
 } from '@server/interfaces/api/discoverInterfaces';
+import { getRecommendationsForUser } from '@server/lib/recommendations';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { mapProductionCompany } from '@server/models/Movie';
@@ -798,6 +799,63 @@ discoverRoutes.get('/trending', async (req, res, next) => {
     return next({
       status: 500,
       message: 'Unable to retrieve trending items.',
+    });
+  }
+});
+
+discoverRoutes.get('/recommendations', async (req, res, next) => {
+  const tmdb = createTmdbWithRegionLanguage(req.user);
+  const itemsPerPage = 20;
+
+  try {
+    const mediaType = (req.query.mediaType as 'all' | 'movie' | 'tv') ?? 'all';
+    const language = (req.query.language as string) ?? req.locale;
+    const page = Math.max(1, Number(req.query.page) || 1);
+
+    const recommendations = req.user
+      ? await getRecommendationsForUser(req.user, tmdb, language)
+      : [];
+    const filtered =
+      mediaType === 'all'
+        ? recommendations
+        : recommendations.filter((rec) => rec.mediaType === mediaType);
+    const pageItems = filtered.slice(
+      (page - 1) * itemsPerPage,
+      page * itemsPerPage
+    );
+
+    const media = await Media.getRelatedMedia(
+      req.user,
+      pageItems.map((rec) => ({
+        tmdbId: rec.result.id,
+        mediaType: rec.mediaType,
+      })),
+      { includeActiveRequest: true }
+    );
+
+    return res.status(200).json({
+      page,
+      totalPages: Math.max(1, Math.ceil(filtered.length / itemsPerPage)),
+      totalResults: filtered.length,
+      results: pageItems.map((rec) => {
+        const selectedMedia = media.find(
+          (med) =>
+            med.tmdbId === rec.result.id && med.mediaType === rec.mediaType
+        );
+
+        return rec.result.media_type === 'movie'
+          ? mapMovieResult(rec.result, selectedMedia)
+          : mapTvResult(rec.result, selectedMedia);
+      }),
+    });
+  } catch (e) {
+    logger.debug('Something went wrong retrieving recommendations', {
+      label: 'API',
+      errorMessage: e.message,
+    });
+    return next({
+      status: 500,
+      message: 'Unable to retrieve recommendations.',
     });
   }
 });

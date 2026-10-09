@@ -221,6 +221,17 @@ const Discover = () => {
           case DiscoverSliderType.PLEX_WATCHLIST:
             sliderComponent = <PlexWatchlistSlider />;
             break;
+          case DiscoverSliderType.RECOMMENDATIONS:
+            sliderComponent = (
+              <MediaSlider
+                sliderKey="recommendations"
+                title={intl.formatMessage(sliderTitles.recommendations)}
+                url="/api/v1/discover/recommendations"
+                linkUrl="/discover/recommendations"
+                hideWhenEmpty
+              />
+            );
+            break;
           case DiscoverSliderType.TRENDING:
             sliderComponent = (
               <MediaSlider

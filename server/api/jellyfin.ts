@@ -93,6 +93,23 @@ export interface JellyfinLibraryItem {
   IndexNumberEnd?: number;
   ParentIndexNumber?: number;
   MediaType: string;
+  UserData?: JellyfinUserData;
+}
+
+export interface JellyfinUserData {
+  PlayCount?: number;
+  IsFavorite?: boolean;
+  Played?: boolean;
+  LastPlayedDate?: string;
+}
+
+export interface JellyfinUserItemsQuery {
+  includeItemTypes: ('Movie' | 'Series' | 'Episode')[];
+  filters?: ('IsPlayed' | 'IsFavorite')[];
+  ids?: string[];
+  sortBy?: string;
+  sortOrder?: 'Ascending' | 'Descending';
+  limit?: number;
 }
 
 export interface JellyfinMediaStream {
@@ -572,6 +589,49 @@ class JellyfinAPI extends ExternalAPI {
     } catch (e) {
       logger.error(
         `Something went wrong while getting the list of episodes from the Jellyfin server: ${e.message}`,
+        { label: 'Jellyfin API', error: e.response?.status }
+      );
+
+      if (!e.response) {
+        throw new ApiError(502, ApiErrorCode.ConnectionError);
+      }
+
+      throw new ApiError(e.response.status, ApiErrorCode.InvalidAuthToken);
+    }
+  }
+
+  /**
+   * Returns items from the perspective of a specific user, including their
+   * playback state (UserData). Used to build watch history based
+   * recommendations, so it requires an API key that can read any user.
+   */
+  public async getUserItems(
+    userId: string,
+    query: JellyfinUserItemsQuery
+  ): Promise<JellyfinLibraryItemExtended[]> {
+    try {
+      const itemResponse = await this.get<JellyfinItemsReponse>(
+        `/Users/${userId}/Items`,
+        {
+          params: {
+            Recursive: true,
+            IncludeItemTypes: query.includeItemTypes.join(','),
+            Fields: 'ProviderIds',
+            EnableUserData: true,
+            EnableImages: false,
+            ...(query.filters && { Filters: query.filters.join(',') }),
+            ...(query.ids && { Ids: query.ids.join(',') }),
+            ...(query.sortBy && { SortBy: query.sortBy }),
+            ...(query.sortOrder && { SortOrder: query.sortOrder }),
+            ...(query.limit && { Limit: query.limit }),
+          },
+        }
+      );
+
+      return itemResponse.Items ?? [];
+    } catch (e) {
+      logger.error(
+        `Something went wrong while getting user items from the Jellyfin server: ${e.message}`,
         { label: 'Jellyfin API', error: e.response?.status }
       );
 
